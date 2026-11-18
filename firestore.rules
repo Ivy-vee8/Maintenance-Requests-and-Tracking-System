@@ -1,0 +1,425 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global safety net: default-deny all reads and writes
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ---- Global Hardened Helper Primitives ----
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isBootstrappedAdminEmail() {
+      return isVerifiedUser()
+        && ('email' in request.auth.token)
+        && request.auth.token.email is string
+        && request.auth.token.email.lower() == 'okumuvelmaatieno@gmail.com';
+    }
+
+    function isAdmin() {
+      return isVerifiedUser() && (
+        isBootstrappedAdminEmail() ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isMaintenanceUser() {
+      return isVerifiedUser() &&
+        exists(/databases/$(database)/documents/maintenance_staff/$(request.auth.uid));
+    }
+
+    // ---- Validation Blueprints (Anti-Update-Gap) ----
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['userId', 'fullName', 'email', 'role', 'department', 'accountStatus', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['userId', 'fullName', 'email', 'role', 'department', 'accountStatus', 'createdAt', 'updatedAt'])
+        && isValidId(data.userId)
+        && data.fullName is string && data.fullName.size() >= 2 && data.fullName.size() <= 100
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 150
+        && data.role in ['admin', 'staff', 'maintenance']
+        && data.department is string && data.department.size() >= 2 && data.department.size() <= 100
+        && data.accountStatus in ['active', 'inactive']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidAdminMarker(data) {
+      return data.keys().hasAll(['userId', 'grantedBy', 'createdAt'])
+        && data.keys().hasOnly(['userId', 'grantedBy', 'createdAt'])
+        && isValidId(data.userId)
+        && data.grantedBy is string && data.grantedBy.size() >= 1 && data.grantedBy.size() <= 128
+        && data.createdAt is timestamp;
+    }
+
+    function isValidMaintenanceMarker(data) {
+      return data.keys().hasAll(['userId', 'grantedBy', 'createdAt'])
+        && data.keys().hasOnly(['userId', 'grantedBy', 'createdAt'])
+        && isValidId(data.userId)
+        && data.grantedBy is string && data.grantedBy.size() >= 1 && data.grantedBy.size() <= 128
+        && data.createdAt is timestamp;
+    }
+
+    function isValidCategory(data) {
+      return data.keys().hasAll(['categoryId', 'name', 'description', 'isActive', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['categoryId', 'name', 'description', 'isActive', 'createdAt', 'updatedAt'])
+        && data.categoryId is string && data.categoryId.size() >= 2 && data.categoryId.size() <= 64 && data.categoryId.matches('^[a-zA-Z0-9_\\-]+$')
+        && data.name is string && data.name.size() >= 2 && data.name.size() <= 80
+        && data.description is string && data.description.size() <= 300
+        && data.isActive is bool
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidMaintenanceRequest(data) {
+      return data.keys().hasAll([
+          'requestId', 'title', 'description', 'categoryId', 'categoryName',
+          'location', 'priority', 'status', 'submittedBy', 'submittedByName',
+          'submittedByDepartment', 'assignedTo', 'assignedToName',
+          'resolutionNotes', 'rejectionReason', 'attachmentUrl',
+          'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'requestId', 'title', 'description', 'categoryId', 'categoryName',
+          'location', 'priority', 'status', 'submittedBy', 'submittedByName',
+          'submittedByDepartment', 'assignedTo', 'assignedToName', 'assignedAt',
+          'resolutionNotes', 'rejectionReason', 'attachmentUrl',
+          'createdAt', 'updatedAt'
+        ])
+        && data.requestId is string && data.requestId.size() >= 4 && data.requestId.size() <= 64 && data.requestId.matches('^[a-zA-Z0-9_\\-]+$')
+        && data.title is string && data.title.size() >= 3 && data.title.size() <= 150
+        && data.description is string && data.description.size() >= 5 && data.description.size() <= 2000
+        && data.categoryId is string && data.categoryId.size() >= 2 && data.categoryId.size() <= 64 && data.categoryId.matches('^[a-zA-Z0-9_\\-]+$')
+        && data.categoryName is string && data.categoryName.size() >= 2 && data.categoryName.size() <= 80
+        && data.location is string && data.location.size() >= 2 && data.location.size() <= 120
+        && data.priority in ['Low', 'Medium', 'High', 'Critical']
+        && data.status in ['Pending', 'Assigned', 'In Progress', 'Resolved', 'Rejected']
+        && isValidId(data.submittedBy)
+        && data.submittedByName is string && data.submittedByName.size() >= 1 && data.submittedByName.size() <= 100
+        && data.submittedByDepartment is string && data.submittedByDepartment.size() >= 1 && data.submittedByDepartment.size() <= 100
+        && data.assignedTo is string && data.assignedTo.size() <= 128
+        && data.assignedToName is string && data.assignedToName.size() <= 100
+        && (!('assignedAt' in data) || data.assignedAt is timestamp)
+        && data.resolutionNotes is string && data.resolutionNotes.size() <= 2000
+        && data.rejectionReason is string && data.rejectionReason.size() <= 1000
+        && data.attachmentUrl is string && data.attachmentUrl.size() <= 500
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidAssignment(data) {
+      return data.keys().hasAll([
+          'assignmentId', 'requestId', 'assignedTo', 'assignedToName',
+          'assignedBy', 'assignedByName', 'assignmentNotes', 'assignedAt'
+        ])
+        && data.keys().hasOnly([
+          'assignmentId', 'requestId', 'assignedTo', 'assignedToName',
+          'assignedBy', 'assignedByName', 'assignmentNotes', 'assignedAt'
+        ])
+        && data.assignmentId is string && data.assignmentId.size() >= 4 && data.assignmentId.size() <= 64 && data.assignmentId.matches('^[a-zA-Z0-9_\\-]+$')
+        && data.requestId is string && data.requestId.size() >= 4 && data.requestId.size() <= 64 && data.requestId.matches('^[a-zA-Z0-9_\\-]+$')
+        && isValidId(data.assignedTo)
+        && data.assignedToName is string && data.assignedToName.size() >= 1 && data.assignedToName.size() <= 100
+        && isValidId(data.assignedBy)
+        && data.assignedByName is string && data.assignedByName.size() >= 1 && data.assignedByName.size() <= 100
+        && data.assignmentNotes is string && data.assignmentNotes.size() <= 1000
+        && data.assignedAt is timestamp;
+    }
+
+    function isValidStatusHistory(data) {
+      return data.keys().hasAll([
+          'historyId', 'requestId', 'previousStatus', 'newStatus',
+          'changedBy', 'changedByName', 'changedByRole',
+          'requestOwnerId', 'requestAssigneeId', 'comments', 'changedAt'
+        ])
+        && data.keys().hasOnly([
+          'historyId', 'requestId', 'previousStatus', 'newStatus',
+          'changedBy', 'changedByName', 'changedByRole',
+          'requestOwnerId', 'requestAssigneeId', 'comments', 'changedAt'
+        ])
+        && data.historyId is string && data.historyId.size() >= 4 && data.historyId.size() <= 64 && data.historyId.matches('^[a-zA-Z0-9_\\-]+$')
+        && data.requestId is string && data.requestId.size() >= 4 && data.requestId.size() <= 64 && data.requestId.matches('^[a-zA-Z0-9_\\-]+$')
+        && data.previousStatus in ['None', 'Pending', 'Assigned', 'In Progress', 'Resolved', 'Rejected']
+        && data.newStatus in ['Pending', 'Assigned', 'In Progress', 'Resolved', 'Rejected']
+        && isValidId(data.changedBy)
+        && data.changedByName is string && data.changedByName.size() >= 1 && data.changedByName.size() <= 100
+        && data.changedByRole in ['admin', 'staff', 'maintenance']
+        && isValidId(data.requestOwnerId)
+        && data.requestAssigneeId is string && data.requestAssigneeId.size() <= 128
+        && data.comments is string && data.comments.size() <= 1000
+        && data.changedAt is timestamp;
+    }
+
+    function isValidSystemBootstrap(data) {
+      return data.keys().hasAll(['initialized', 'adminUserId', 'createdAt'])
+        && data.keys().hasOnly(['initialized', 'adminUserId', 'createdAt'])
+        && data.initialized == true
+        && isValidId(data.adminUserId)
+        && data.createdAt is timestamp;
+    }
+
+    // ---- Collection Rules ----
+
+    // Connection test document for initial SDK boot verification
+    match /test/connection {
+      allow get: if true;
+    }
+
+    // Users collection (PII isolated to owner or verified Admin)
+    match /users/{userId} {
+      allow get: if isVerifiedUser() && isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if isVerifiedUser() && (isAdmin() || resource.data.userId == request.auth.uid);
+
+      allow create: if isVerifiedUser()
+        && isValidId(userId)
+        && isValidUser(incoming())
+        && incoming().userId == userId
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && (
+          (isOwner(userId) && incoming().email.lower() == request.auth.token.email.lower() && incoming().role == 'staff' && incoming().accountStatus == 'active') ||
+          (isOwner(userId) && isBootstrappedAdminEmail() && incoming().email.lower() == request.auth.token.email.lower() && incoming().role == 'admin' && incoming().accountStatus == 'active') ||
+          isAdmin()
+        );
+
+      allow update: if isVerifiedUser()
+        && isValidId(userId)
+        && isValidUser(incoming())
+        && incoming().userId == existing().userId
+        && incoming().email == existing().email
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          (isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'department', 'updatedAt'])) ||
+          (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'role', 'department', 'accountStatus', 'updatedAt']))
+        );
+
+      allow delete: if isAdmin() && isValidId(userId) && userId != request.auth.uid;
+    }
+
+    // Trusted Admin Markers
+    match /admins/{userId} {
+      allow get: if isVerifiedUser() && isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if isAdmin();
+
+      allow create: if isVerifiedUser()
+        && isValidId(userId)
+        && isValidAdminMarker(incoming())
+        && incoming().userId == userId
+        && incoming().createdAt == request.time
+        && (
+          (isOwner(userId) && isBootstrappedAdminEmail() && incoming().grantedBy == request.auth.uid) ||
+          (isAdmin() && incoming().grantedBy == request.auth.uid)
+        );
+
+      allow update: if false;
+      allow delete: if isAdmin() && isValidId(userId) && userId != request.auth.uid;
+    }
+
+    // Trusted Maintenance Staff Markers
+    match /maintenance_staff/{userId} {
+      allow get: if isVerifiedUser() && isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if isAdmin();
+
+      allow create: if isAdmin()
+        && isValidId(userId)
+        && isValidMaintenanceMarker(incoming())
+        && incoming().userId == userId
+        && incoming().grantedBy == request.auth.uid
+        && incoming().createdAt == request.time;
+
+      allow update: if false;
+      allow delete: if isAdmin() && isValidId(userId);
+    }
+
+    // Maintenance Categories
+    match /categories/{categoryId} {
+      allow get: if isSignedIn() && isValidId(categoryId);
+      allow list: if isSignedIn() && resource.data.isActive in [true, false];
+
+      allow create: if isAdmin()
+        && isValidId(categoryId)
+        && isValidCategory(incoming())
+        && incoming().categoryId == categoryId
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isAdmin()
+        && isValidId(categoryId)
+        && isValidCategory(incoming())
+        && incoming().categoryId == existing().categoryId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'description', 'isActive', 'updatedAt']);
+
+      allow delete: if isAdmin() && isValidId(categoryId);
+    }
+
+    // Maintenance Requests
+    match /maintenance_requests/{requestId} {
+      allow get: if isVerifiedUser()
+        && isValidId(requestId)
+        && (isAdmin() || existing().submittedBy == request.auth.uid || existing().assignedTo == request.auth.uid);
+
+      allow list: if isVerifiedUser()
+        && (isAdmin() || resource.data.submittedBy == request.auth.uid || resource.data.assignedTo == request.auth.uid);
+
+      allow create: if isVerifiedUser()
+        && isValidId(requestId)
+        && isValidMaintenanceRequest(incoming())
+        && incoming().requestId == requestId
+        && incoming().submittedBy == request.auth.uid
+        && incoming().status == 'Pending'
+        && incoming().assignedTo == ''
+        && incoming().assignedToName == ''
+        && !('assignedAt' in incoming())
+        && incoming().resolutionNotes == ''
+        && incoming().rejectionReason == ''
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && exists(/databases/$(database)/documents/categories/$(incoming().categoryId));
+
+      allow update: if isVerifiedUser()
+        && isValidId(requestId)
+        && isValidMaintenanceRequest(incoming())
+        && incoming().requestId == existing().requestId
+        && incoming().submittedBy == existing().submittedBy
+        && incoming().submittedByName == existing().submittedByName
+        && incoming().submittedByDepartment == existing().submittedByDepartment
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          // Tier 1: Admin Override & Assignment / Rejection / Re-prioritization
+          (
+            isAdmin()
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'title', 'description', 'categoryId', 'categoryName', 'location',
+              'priority', 'status', 'assignedTo', 'assignedToName', 'assignedAt',
+              'resolutionNotes', 'rejectionReason', 'updatedAt'
+            ])
+          ) ||
+          // Tier 2: Assigned Maintenance Personnel Progress & Completion (Locked if terminal)
+          (
+            isMaintenanceUser()
+            && !(existing().status in ['Resolved', 'Rejected'])
+            && existing().assignedTo == request.auth.uid
+            && (
+              (existing().status == 'Assigned' && incoming().status == 'In Progress') ||
+              (existing().status == 'In Progress' && incoming().status in ['In Progress', 'Resolved'])
+            )
+            && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'resolutionNotes', 'updatedAt'])
+          ) ||
+          // Tier 3: Requester edits own request only while Pending
+          (
+            existing().submittedBy == request.auth.uid
+            && existing().status == 'Pending'
+            && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'description', 'location', 'priority', 'attachmentUrl', 'updatedAt'])
+          )
+        );
+
+      allow delete: if isAdmin() && isValidId(requestId);
+    }
+
+    // Assignments Collection
+    match /assignments/{assignmentId} {
+      allow get: if isVerifiedUser()
+        && isValidId(assignmentId)
+        && (
+          isAdmin() ||
+          existing().assignedTo == request.auth.uid ||
+          get(/databases/$(database)/documents/maintenance_requests/$(existing().requestId)).data.submittedBy == request.auth.uid
+        );
+
+      allow list: if isVerifiedUser()
+        && (isAdmin() || resource.data.assignedTo == request.auth.uid);
+
+      allow create: if isAdmin()
+        && isValidId(assignmentId)
+        && isValidAssignment(incoming())
+        && incoming().assignmentId == assignmentId
+        && incoming().assignedBy == request.auth.uid
+        && incoming().assignedAt == request.time
+        && existsAfter(/databases/$(database)/documents/maintenance_requests/$(incoming().requestId));
+
+      allow update: if isAdmin()
+        && isValidId(assignmentId)
+        && isValidAssignment(incoming())
+        && incoming().assignmentId == existing().assignmentId
+        && incoming().requestId == existing().requestId
+        && incoming().assignedBy == existing().assignedBy
+        && incoming().assignedAt == existing().assignedAt
+        && incoming().diff(existing()).affectedKeys().hasOnly(['assignedTo', 'assignedToName', 'assignmentNotes']);
+
+      allow delete: if isAdmin() && isValidId(assignmentId);
+    }
+
+    // Immutable Status History Audit Trail
+    match /status_history/{historyId} {
+      allow get: if isVerifiedUser()
+        && isValidId(historyId)
+        && (isAdmin() || existing().requestOwnerId == request.auth.uid || existing().requestAssigneeId == request.auth.uid);
+
+      allow list: if isVerifiedUser()
+        && (isAdmin() || resource.data.requestOwnerId == request.auth.uid || resource.data.requestAssigneeId == request.auth.uid);
+
+      allow create: if isVerifiedUser()
+        && isValidId(historyId)
+        && isValidStatusHistory(incoming())
+        && incoming().historyId == historyId
+        && incoming().changedBy == request.auth.uid
+        && incoming().changedAt == request.time
+        && existsAfter(/databases/$(database)/documents/maintenance_requests/$(incoming().requestId))
+        && (
+          isAdmin() ||
+          (
+            incoming().requestOwnerId == request.auth.uid
+            && incoming().previousStatus == 'None'
+            && incoming().newStatus == 'Pending'
+          ) ||
+          (
+            isMaintenanceUser()
+            && incoming().requestAssigneeId == request.auth.uid
+            && incoming().newStatus in ['In Progress', 'Resolved']
+          )
+        );
+
+      allow update: if false;
+      allow delete: if isAdmin() && isValidId(historyId);
+    }
+
+    // System Bootstrap Lock
+    match /system_config/{docId} {
+      allow get: if isVerifiedUser() && docId == 'bootstrap';
+      allow create: if isVerifiedUser()
+        && docId == 'bootstrap'
+        && isValidSystemBootstrap(incoming())
+        && incoming().adminUserId == request.auth.uid
+        && incoming().createdAt == request.time
+        && isBootstrappedAdminEmail();
+      allow update, delete: if false;
+    }
+  }
+}

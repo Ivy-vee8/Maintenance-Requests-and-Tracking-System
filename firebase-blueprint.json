@@ -1,0 +1,484 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Registered system user profile with role-based access control and department affiliation.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the user.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "fullName": {
+          "type": "string",
+          "description": "Full display name of the user.",
+          "minLength": 2,
+          "maxLength": 100
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Verified organizational email address.",
+          "minLength": 3,
+          "maxLength": 150
+        },
+        "role": {
+          "type": "string",
+          "description": "Authorization role in the system.",
+          "enum": ["admin", "staff", "maintenance"]
+        },
+        "department": {
+          "type": "string",
+          "description": "Organizational department or unit.",
+          "minLength": 2,
+          "maxLength": 100
+        },
+        "accountStatus": {
+          "type": "string",
+          "description": "Operational account state.",
+          "enum": ["active", "inactive"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when user was created."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when user profile was last updated."
+        }
+      },
+      "required": ["userId", "fullName", "email", "role", "department", "accountStatus", "createdAt", "updatedAt"]
+    },
+    "AdminMarker": {
+      "title": "AdminMarker",
+      "description": "Trusted marker document granting Administrator privileges to a user UID.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "UID of the administrator.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "grantedBy": {
+          "type": "string",
+          "description": "UID or bootstrap mechanism that granted admin role.",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when admin access was granted."
+        }
+      },
+      "required": ["userId", "grantedBy", "createdAt"]
+    },
+    "MaintenanceMarker": {
+      "title": "MaintenanceMarker",
+      "description": "Trusted marker document granting Maintenance Personnel privileges to a user UID.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "UID of the maintenance employee.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "grantedBy": {
+          "type": "string",
+          "description": "UID of the administrator who granted maintenance role.",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when maintenance role was granted."
+        }
+      },
+      "required": ["userId", "grantedBy", "createdAt"]
+    },
+    "Category": {
+      "title": "Category",
+      "description": "Maintenance problem classification category.",
+      "type": "object",
+      "properties": {
+        "categoryId": {
+          "type": "string",
+          "description": "Unique category slug identifier.",
+          "minLength": 2,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "description": "Category display name.",
+          "minLength": 2,
+          "maxLength": 80
+        },
+        "description": {
+          "type": "string",
+          "description": "Short description of covered issues.",
+          "maxLength": 300
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Whether the category is selectable for new requests."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when category was created."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when category was last updated."
+        }
+      },
+      "required": ["categoryId", "name", "description", "isActive", "createdAt", "updatedAt"]
+    },
+    "MaintenanceRequest": {
+      "title": "MaintenanceRequest",
+      "description": "Core maintenance work request submitted by staff and tracked through resolution.",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "description": "Unique request identifier.",
+          "minLength": 4,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "title": {
+          "type": "string",
+          "description": "Concise summary of the maintenance problem.",
+          "minLength": 3,
+          "maxLength": 150
+        },
+        "description": {
+          "type": "string",
+          "description": "Detailed description of the problem.",
+          "minLength": 5,
+          "maxLength": 2000
+        },
+        "categoryId": {
+          "type": "string",
+          "description": "Reference ID of the maintenance category.",
+          "minLength": 2,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "categoryName": {
+          "type": "string",
+          "description": "Denormalized category name for display and reporting.",
+          "minLength": 2,
+          "maxLength": 80
+        },
+        "location": {
+          "type": "string",
+          "description": "Building, room, or department location of the issue.",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "priority": {
+          "type": "string",
+          "description": "Urgency classification.",
+          "enum": ["Low", "Medium", "High", "Critical"]
+        },
+        "status": {
+          "type": "string",
+          "description": "Current workflow status.",
+          "enum": ["Pending", "Assigned", "In Progress", "Resolved", "Rejected"]
+        },
+        "submittedBy": {
+          "type": "string",
+          "description": "UID of the requester.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "submittedByName": {
+          "type": "string",
+          "description": "Full name of the requester.",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "submittedByDepartment": {
+          "type": "string",
+          "description": "Department of the requester.",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "assignedTo": {
+          "type": "string",
+          "description": "UID of assigned maintenance personnel, or empty string if unassigned.",
+          "maxLength": 128
+        },
+        "assignedToName": {
+          "type": "string",
+          "description": "Full name of assigned maintenance personnel, or empty string if unassigned.",
+          "maxLength": 100
+        },
+        "resolutionNotes": {
+          "type": "string",
+          "description": "Notes describing completed repair or resolution details.",
+          "maxLength": 2000
+        },
+        "rejectionReason": {
+          "type": "string",
+          "description": "Explanation when a request is rejected.",
+          "maxLength": 1000
+        },
+        "attachmentUrl": {
+          "type": "string",
+          "description": "Optional uploaded image attachment URL path.",
+          "maxLength": 500
+        },
+        "assignedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when request was assigned."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when request was submitted."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of the latest update."
+        }
+      },
+      "required": [
+        "requestId",
+        "title",
+        "description",
+        "categoryId",
+        "categoryName",
+        "location",
+        "priority",
+        "status",
+        "submittedBy",
+        "submittedByName",
+        "submittedByDepartment",
+        "assignedTo",
+        "assignedToName",
+        "resolutionNotes",
+        "rejectionReason",
+        "attachmentUrl",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Assignment": {
+      "title": "Assignment",
+      "description": "Record of a maintenance request assignment to maintenance personnel.",
+      "type": "object",
+      "properties": {
+        "assignmentId": {
+          "type": "string",
+          "description": "Unique assignment document identifier.",
+          "minLength": 4,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "requestId": {
+          "type": "string",
+          "description": "ID of the maintenance request being assigned.",
+          "minLength": 4,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "assignedTo": {
+          "type": "string",
+          "description": "UID of the assigned maintenance employee.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "assignedToName": {
+          "type": "string",
+          "description": "Display name of the assigned maintenance employee.",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "assignedBy": {
+          "type": "string",
+          "description": "UID of the administrator making the assignment.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "assignedByName": {
+          "type": "string",
+          "description": "Display name of the administrator making the assignment.",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "assignmentNotes": {
+          "type": "string",
+          "description": "Instructions or notes from the administrator.",
+          "maxLength": 1000
+        },
+        "assignedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of the assignment."
+        }
+      },
+      "required": ["assignmentId", "requestId", "assignedTo", "assignedToName", "assignedBy", "assignedByName", "assignmentNotes", "assignedAt"]
+    },
+    "StatusHistory": {
+      "title": "StatusHistory",
+      "description": "Immutable audit log entry capturing every status transition on a maintenance request.",
+      "type": "object",
+      "properties": {
+        "historyId": {
+          "type": "string",
+          "description": "Unique status history entry identifier.",
+          "minLength": 4,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "requestId": {
+          "type": "string",
+          "description": "ID of the associated maintenance request.",
+          "minLength": 4,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "previousStatus": {
+          "type": "string",
+          "description": "Status prior to the transition.",
+          "enum": ["None", "Pending", "Assigned", "In Progress", "Resolved", "Rejected"]
+        },
+        "newStatus": {
+          "type": "string",
+          "description": "New status after the transition.",
+          "enum": ["Pending", "Assigned", "In Progress", "Resolved", "Rejected"]
+        },
+        "changedBy": {
+          "type": "string",
+          "description": "UID of the user who executed the status change.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "changedByName": {
+          "type": "string",
+          "description": "Display name of the user who executed the status change.",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "changedByRole": {
+          "type": "string",
+          "description": "Role of the user who executed the change.",
+          "enum": ["admin", "staff", "maintenance"]
+        },
+        "requestOwnerId": {
+          "type": "string",
+          "description": "UID of the requester owning the parent request.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "requestAssigneeId": {
+          "type": "string",
+          "description": "UID of the maintenance employee assigned to the parent request, or empty string.",
+          "maxLength": 128
+        },
+        "comments": {
+          "type": "string",
+          "description": "Contextual notes for the status transition.",
+          "maxLength": 1000
+        },
+        "changedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of the transition."
+        }
+      },
+      "required": [
+        "historyId",
+        "requestId",
+        "previousStatus",
+        "newStatus",
+        "changedBy",
+        "changedByName",
+        "changedByRole",
+        "requestOwnerId",
+        "requestAssigneeId",
+        "comments",
+        "changedAt"
+      ]
+    },
+    "SystemBootstrap": {
+      "title": "SystemBootstrap",
+      "description": "Tracks one-time initialization of the first administrator account.",
+      "type": "object",
+      "properties": {
+        "initialized": {
+          "type": "boolean",
+          "description": "Whether the initial administrator has been provisioned."
+        },
+        "adminUserId": {
+          "type": "string",
+          "description": "UID of the initial administrator.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when bootstrap completed."
+        }
+      },
+      "required": ["initialized", "adminUserId", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profiles containing role and PII email; readable only by owner or admin."
+    },
+    "/admins/{userId}": {
+      "schema": { "$ref": "#/entities/AdminMarker" },
+      "description": "Trusted marker documents identifying system administrators."
+    },
+    "/maintenance_staff/{userId}": {
+      "schema": { "$ref": "#/entities/MaintenanceMarker" },
+      "description": "Trusted marker documents identifying maintenance personnel."
+    },
+    "/categories/{categoryId}": {
+      "schema": { "$ref": "#/entities/Category" },
+      "description": "Organizational maintenance categories managed by administrators."
+    },
+    "/maintenance_requests/{requestId}": {
+      "schema": { "$ref": "#/entities/MaintenanceRequest" },
+      "description": "Maintenance work orders submitted by staff, assigned by admins, and resolved by maintenance personnel."
+    },
+    "/assignments/{assignmentId}": {
+      "schema": { "$ref": "#/entities/Assignment" },
+      "description": "Assignment audit records linking requests to maintenance personnel."
+    },
+    "/status_history/{historyId}": {
+      "schema": { "$ref": "#/entities/StatusHistory" },
+      "description": "Immutable status transition audit trail for maintenance requests."
+    },
+    "/system_config/{docId}": {
+      "schema": { "$ref": "#/entities/SystemBootstrap" },
+      "description": "System configuration documents including one-time admin bootstrap lock."
+    }
+  }
+}

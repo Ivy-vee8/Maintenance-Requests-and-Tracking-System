@@ -1,0 +1,6 @@
+{
+  "name": "MRTMIS — Maintenance Request & Tracking System",
+  "description": "Enterprise Maintenance Request and Tracking Management Information System for centralized work order submission, personnel assignment, status tracking, and operational analytics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
