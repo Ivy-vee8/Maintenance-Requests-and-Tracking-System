@@ -17,7 +17,7 @@ An enterprise-grade full-stack Management Information System (MIS) for centraliz
 | Role | Capabilities |
 | :--- | :--- |
 | **Administrator (`admin`)** | Full visibility across all maintenance requests, technician assignment, priority/status triage, user role & status management (`/users`), category taxonomy management (`/categories`), and management analytics/CSV/PDF reporting (`/reports`). |
-| **Staff / Requester (`staff`)** | Submit new maintenance work orders (`/submit`), upload issue images, track personal requests in real time (`/requests`), and add follow-up comments. Default role assigned on new user registration. |
+| **Staff / Requester (`staff`)** | Submit new maintenance work orders (`/submit`), upload issue images, edit personal requests while `Pending`, and track progress & audit history in real time (`/requests`). Default role assigned on new user registration. |
 | **Maintenance Personnel (`maintenance`)** | View assigned work orders (`/dashboard`, `/requests`), update job progress (`Assigned` → `In Progress` → `Resolved`), and post technical resolution notes. Assigned by an Administrator in `/users`. |
 
 ---
@@ -25,14 +25,15 @@ An enterprise-grade full-stack Management Information System (MIS) for centraliz
 ## Key Features
 
 - **Role-Scoped Dashboards (`/dashboard`):** Live operational KPIs, SLA alerts, category charts, and workload summaries tailored to each role.
-- **Work Order Management (`/requests`, `/submit`):** Search, multi-filter table views, slide-over/modal inspection, image attachment uploads, assignment controls, and full audit/comment trails.
+- **Work Order Management (`/requests`, `/submit`):** Search, multi-filter table views, modal inspection, image attachment uploads, assignment controls, and full audit trails.
 - **Management Reporting (`/reports`):** Date-range filtered analytics with live KPI aggregation, CSV export, and print-ready PDF report layout.
 - **Strict Security & Validation:** Schema-backed Firestore security rules (`firestore.rules`), server-side token verification, role guards on protected routes, and React `ErrorBoundary` resilience.
 
 ---
 
-## Academic & Technical Deliverables Included
+## Full Documentation & Academic Deliverables
 
+- **`docs/DOCUMENTATION.md`** — Complete project documentation (architecture, RBAC matrix, request lifecycle state machine, Firestore data model, REST API reference, security architecture, and demo guide)
 - `firebase-blueprint.json` — Formal entity & JSON Schema data model specification
 - `firestore.rules` — Production Firestore RBAC & payload validation rules
 - `firestore.rules.test.ts` & `security_spec.md` — Security rule verification suite & specification
